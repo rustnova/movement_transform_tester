@@ -1,0 +1,11 @@
+[package]
+name = "movement_tests"
+version = "0.1.0"
+authors = ["rustnova <67828922+rustnova@users.noreply.github.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = { path = "X:/Rust Projects/bevy" }
+rand = "*"
