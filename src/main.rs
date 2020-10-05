@@ -33,7 +33,7 @@ impl std::fmt::Display for State {
 fn main() {
     App::build()
         .add_resource(PrintResource {
-            path: "".to_string(),
+            path: "test_results/".to_string(),
             printed: false,
             ..Default::default()
         })
