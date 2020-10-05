@@ -1,5 +1,5 @@
+use std::fmt::Debug;
 use std::io::prelude::*;
-use std::{fmt::Debug};
 
 use bevy::prelude::*;
 
@@ -9,19 +9,23 @@ type Ticks = u32;
 #[derive(Debug, Default, Clone)]
 pub struct PrintResource {
     pub path: String,
-    pub buffer: String,
+    pub pass_buffer: String,
+    pub fail_buffer: String,
     pub printed: bool,
 }
 impl PrintResource {
     pub fn print(&mut self) {
-        let mut output_file = std::fs::File::create(&self.path).expect("bad path!");
-        output_file
-            .write_all(self.buffer.as_bytes())
+        let mut pass_file = std::fs::File::create(self.path.clone() + "passed.txt").expect("bad path!");
+        let mut fail_file = std::fs::File::create(self.path.clone() + "fail.txt").expect("bad path!");
+        pass_file
+            .write_all(self.pass_buffer.as_bytes())
+            .expect("failed to write!");
+        fail_file
+            .write_all(self.fail_buffer.as_bytes())
             .expect("failed to write!");
         self.printed = true;
     }
 }
-
 
 pub trait TestState {
     fn eval(&mut self, original_state: &Self) -> Result;
@@ -45,20 +49,40 @@ pub struct Result {
     pub time: Ticks,
 }
 
+impl std::fmt::Display for Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:#?} ", self)
+    }
+}
+
 pub struct TestMarker<S>
 where
-    S: TestState + Debug,
+    S: TestState + std::fmt::Display,
 {
     pub original_state: Option<S>,
     pub new_state: Option<S>,
     pub result: Result,
 }
-impl<S: TestState + Debug> TestMarker<S> {
+impl<S: TestState + std::fmt::Display> TestMarker<S> {
     pub fn evaluate(&mut self, printer: &mut PrintResource) {
         if let Some(state) = &mut self.new_state {
             if let Some(original) = &mut self.original_state {
                 self.result = state.eval(original);
-                printer.buffer.push_str(&format!("Test Results:\n{:#?}\n{:#?}\n{:#?}\nEND\n", self.result, self.original_state, self.new_state))
+                if self.result.pass {
+                    printer.pass_buffer.push_str(&format!(
+                        "Test Results: {} {} {}\n",
+                        self.result,
+                        self.original_state.as_ref().unwrap(),
+                        self.new_state.as_ref().unwrap()
+                    ));
+                } else {
+                    printer.fail_buffer.push_str(&format!(
+                        "Test Results: {} {} {}\n",
+                        self.result,
+                        self.original_state.as_ref().unwrap(),
+                        self.new_state.as_ref().unwrap()
+                    ))
+                }
             }
         }
     }

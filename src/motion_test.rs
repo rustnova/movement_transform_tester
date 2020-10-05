@@ -3,7 +3,7 @@ use rand::Rng;
 
 use crate::{
     equations_of_motion::{Destination, EquationsOfMotion, Momentum},
-    movement_transform_tester::{Result, TestMarker},
+    movement_transform_tester::{PrintResource, Result, Status, TestMarker},
     State,
 };
 pub struct MotionTest;
@@ -11,28 +11,53 @@ pub struct MotionTest;
 impl Plugin for MotionTest {
     fn build(&self, app: &mut AppBuilder) {
         app.add_startup_system(start.system())
-            .add_system(movement.system());
+            .add_system(movement.system())
+            .add_system(evaluate.system());
     }
 }
-fn start(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    let mut rng = rand::thread_rng();
 
-    for _ in 0..100 {
-        let original_state = State {
-            transform: Transform::from_translation_rotation(
-                vec3(
-                    rng.gen_range(-500., 500.),
-                    rng.gen_range(-500., 500.),
-                    rng.gen_range(-500., 500.),
-                ),
-                Quat::from_rotation_z(rng.gen_range(0.001, 6.28)),
+fn evaluate(
+    mut printer: ResMut<PrintResource>,
+    time: Res<Time>,
+    mut query: Query<(&mut TestMarker<State>, &Transform)>,
+) {
+    let mut pending = false;
+    for (mut marker, transform) in &mut query.iter() {
+        if time.seconds_since_startup > 10. && marker.result.status == Status::Pending {
+            marker.new_state = Some(State {
+                transform: *transform,
+                ..Default::default()
+            });
+            marker.evaluate(&mut printer);
+        }
+        if marker.result.status == Status::Pending {
+            pending = true
+        }
+    }
+    if printer.printed == false && pending == false {
+        println!("time to print!");
+        printer.print();
+    }
+}
+fn start(mut commands: Commands) {
+    let mut rng = rand::thread_rng();
+    for _ in 0..1000 {
+        let trans = Transform::from_translation_rotation(
+            vec3(
+                rng.gen_range(-500., 500.),
+                rng.gen_range(-500., 500.),
+                rng.gen_range(-500., 500.),
             ),
-            accel: rng.gen_range(0.001, 0.1),
+            Quat::from_rotation_z(rng.gen_range(0.001, 6.28)),
+        );
+        let momentum = Momentum {
+            thrust: rng.gen_range(0.001, 0.1),
             max_rotation: rng.gen_range(0.01, 0.1),
+            inertia: Vec2::default(),
+        };
+        let original_state = State {
+            transform: trans,
+            motion_values: momentum,
             ..Default::default()
         };
         let testmarker = TestMarker {
@@ -41,24 +66,9 @@ fn start(
             result: Result::default(),
         };
 
-        let mesh = Mesh::from(shape::Cube { size: 60.0 });
-        let cube_handle = meshes.add(mesh);
         commands
-            .spawn(PbrComponents {
-                mesh: cube_handle,
-                material: materials.add(StandardMaterial {
-                    albedo: Color::rgb(1.0, 0.0, 1.0),
-                    shaded: false,
-                    ..Default::default()
-                }),
-                transform: original_state.transform,
-                ..Default::default()
-            })
-            .with(Momentum {
-                max_rotation: original_state.max_rotation,
-                thrust: original_state.accel,
-                ..Default::default()
-            })
+            .spawn((trans,))
+            .with(momentum)
             .with(Destination {
                 d: Vec3::new(2000., 10000., 0.0),
             })
