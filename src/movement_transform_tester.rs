@@ -1,10 +1,11 @@
 use std::io::prelude::*;
-use std::{fmt::Debug, fs::File};
+use std::{fmt::Debug};
 
 use bevy::prelude::*;
 
 type Ticks = u32;
-pub type BoxClosey<S: Debug> = Box<dyn Fn(Transform, Transform, Option<S>) -> Result>;
+// pub type BoxClosey<S: Debug> = Box<dyn FnMut(Transform, Transform, Option<S>) -> Result>;
+
 #[derive(Debug, Default, Clone)]
 pub struct PrintResource {
     pub path: String,
@@ -21,14 +22,12 @@ impl PrintResource {
     }
 }
 
-pub trait Test<S> {
-    fn state(&self) -> S
-    where
-        S: Debug;
-    fn evaluate(&mut self) -> Result;
+
+pub trait TestState {
+    fn eval(&mut self, original_state: &Self) -> Result;
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Status {
     Pending,
     Complete,
@@ -48,16 +47,19 @@ pub struct Result {
 
 pub struct TestMarker<S>
 where
-    S: Debug,
+    S: TestState + Debug,
 {
-    pub original_trans: Transform,
-    pub new_trans: Transform,
-    pub eval: BoxClosey<S>,
+    pub original_state: Option<S>,
+    pub new_state: Option<S>,
     pub result: Result,
-    pub state: Option<S>,
 }
-impl<S: Debug> TestMarker<S> {
-    pub fn evaluate(&self) {
-        let x = (self.eval)(Transform::default(), Transform::default(), None);
+impl<S: TestState + Debug> TestMarker<S> {
+    pub fn evaluate(&mut self, printer: &mut PrintResource) {
+        if let Some(state) = &mut self.new_state {
+            if let Some(original) = &mut self.original_state {
+                self.result = state.eval(original);
+                printer.buffer.push_str(&format!("Test Results:\n{:#?}\n{:#?}\n{:#?}\nEND\n", self.result, self.original_state, self.new_state))
+            }
+        }
     }
 }

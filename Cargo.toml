@@ -7,5 +7,5 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = { path = "X:/Rust Projects/bevy" }
+bevy = { path = "E:/Rust/Projects/bevy" }
 rand = "*"
