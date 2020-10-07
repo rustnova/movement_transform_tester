@@ -67,7 +67,7 @@ impl<S: TestState + std::fmt::Display> TestMarker<S> {
     pub fn evaluate(&mut self, printer: &mut PrintResource) {
         if let Some(state) = &mut self.new_state {
             if let Some(original) = &mut self.original_state {
-                self.result = state.eval(original);
+                // self.result = state.eval(original);
                 if self.result.pass {
                     printer.pass_buffer.push_str(&format!(
                         "Test Results: {} {} {}\n",

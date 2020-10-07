@@ -19,19 +19,50 @@ impl Plugin for MotionTest {
 fn evaluate(
     mut printer: ResMut<PrintResource>,
     time: Res<Time>,
-    mut query: Query<(&mut TestMarker<State>, &Transform)>,
+    mut query: Query<(&mut TestMarker<State>, &Transform, &Destination, &Momentum)>,
 ) {
     let mut pending = false;
-    for (mut marker, transform) in &mut query.iter() {
-        if time.seconds_since_startup > 10. && marker.result.status == Status::Pending {
-            marker.new_state = Some(State {
-                transform: *transform,
-                ..Default::default()
-            });
-            marker.evaluate(&mut printer);
-        }
-        if marker.result.status == Status::Pending {
-            pending = true
+    for (mut marker, transform, destination, momentum) in &mut query.iter() {
+        if let Some(mut state) = marker.original_state {
+            // println!("tick_counter {}", state.tick_counter);
+
+            if state.tick_counter > state.tick_goal && marker.result.status == Status::Pending {
+                marker.new_state = Some(State {
+                    motion_values: *momentum,
+                    transform: *transform,
+                    destination: destination.d,
+                    ..Default::default()
+                });
+                // marker.evaluate(&mut printer);
+                let dist = state
+                    .motion_values
+                    .distance(&transform.translation(), &destination.d);
+                    println!("dist {}", dist);
+                if dist < 100. {
+                    marker.result = Result {
+                        pass: true,
+                        status: Status::Complete,
+                        time: state.tick_counter,
+                    };
+                    marker.evaluate(&mut printer);
+                    // printer.print();
+                    // println!("Passed Result!")
+                } else {
+                    marker.result = Result {
+                        pass: false,
+                        status: Status::Complete,
+                        time: state.tick_counter,
+                    };
+                    marker.evaluate(&mut printer);
+                    // printer.print();
+                    // println!("Failed Result!")
+                }
+            }
+            if marker.result.status == Status::Pending {
+                pending = true
+            }
+            state.tick_counter += 1;
+            marker.original_state.replace(state);
         }
     }
     if printer.printed == false && pending == false {
@@ -46,18 +77,29 @@ fn start(mut commands: Commands) {
             vec3(
                 rng.gen_range(-500., 500.),
                 rng.gen_range(-500., 500.),
-                rng.gen_range(-500., 500.),
+                0.0,
             ),
             Quat::from_rotation_z(rng.gen_range(0.001, 6.28)),
         );
+        let destination = Destination {
+            d: vec3(
+                rng.gen_range(50000., 60000.),
+                rng.gen_range(50000., 60000.),
+                0.0,
+            ),
+        };
         let momentum = Momentum {
-            thrust: rng.gen_range(0.001, 0.1),
-            max_rotation: rng.gen_range(0.01, 0.1),
+            thrust: rng.gen_range(0.01, 0.1),
+            max_rotation: rng.gen_range(1.0, 2.0),
             inertia: Vec2::default(),
         };
+        let ticks_to_dest = momentum.ticks_to_dest_const_accel_zero_vel(trans.translation(), destination.d);
+        println!("ticks: {}", ticks_to_dest);
         let original_state = State {
             transform: trans,
             motion_values: momentum,
+            tick_goal: ticks_to_dest as u32,
+            destination: destination.d,
             ..Default::default()
         };
         let testmarker = TestMarker {
@@ -69,9 +111,7 @@ fn start(mut commands: Commands) {
         commands
             .spawn((trans,))
             .with(momentum)
-            .with(Destination {
-                d: Vec3::new(2000., 10000., 0.0),
-            })
+            .with(destination)
             .with(testmarker);
     }
 }

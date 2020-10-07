@@ -47,6 +47,9 @@ pub trait EquationsOfMotion {
     fn ticks_to_dest(&self, current: Vec3, dest: Vec3) -> f32 {
         self.distance(&current, &dest) / self.inertia().length().abs()
     }
+    fn ticks_to_dest_const_accel_zero_vel(&self, current: Vec3, dest: Vec3) -> f32 {
+        (self.distance(&current, &dest) / (0.5 * self.thrust())).sqrt()
+    }
     fn ticks_to_point_of_no_return(&self, current: Vec3, dest: Vec3) -> f32 {
         let angle = current.angle_between(dest);
         self.ticks_to_dest(current, dest) - self.ticks_to_turn_and_stop(angle)
